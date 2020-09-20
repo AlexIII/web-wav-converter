@@ -1,6 +1,6 @@
 # MP3 to WAV converter
 
-<img width="350" align="right" src="screencap.png" />
+[<img width="350" align="right" src="screencap.png" />](https://alexiii.github.io/web-wav-converter)
 
 - Works offline
 - Processes files in bulk
