@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "target": "es2015",
+        "module": "es2015",
+        "outDir": "./",
+        //"sourceMap": true,
+        "esModuleInterop": true,
+        "noImplicitAny": true,
+        "alwaysStrict": true,
+        "lib": ["es2016", "dom"],
+        "strictNullChecks": true,
+        //"incremental": true,
+        "strict": true,
+    },
+    "files": ["./wav-conv.ts"]
+}

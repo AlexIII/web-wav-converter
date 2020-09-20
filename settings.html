@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="settings.css">
+</head>
+<title>MP3 to WAV converter</title>
+<body>
+    <div class="page-wrapper">
+        <h1>MP3 to WAV converter</h1>
+        <h2>Works offline*. Processes files in bulk. Works with most audio formats.</h2>
+
+        <div class="drag-and-drop-area">
+            Darg &amp; drop audio files here
+            or <label class="custom-file-input" for="file-input"></label>
+            <input id="file-input" type="file" multiple="multiple" accept="audio/*" style="display: none">
+        </div>
+
+        <div class="wav-settings">
+            <label for="wav-bit-depth">Bit-depth</label>
+            <select id="wav-bit-depth">
+                <option value="16" selected>16</option> 
+                <option value="8">8</option>
+            </select>
+            <label for="wav-channels">Channels</label>
+            <select id="wav-channels">
+                <option value="both" selected>2</option> 
+                <option value="mix">1 - mix</option>
+                <option value="left">1 - left</option>
+                <option value="right">1 - right</option>
+            </select>
+            <label for="wav-sample-rate">Sample rate</label>
+            <select id="wav-sample-rate">
+                <option value="48000" selected>48000</option> 
+                <option value="44100">44100</option>
+                <option value="32000">32000</option>
+                <option value="28000">28000</option>
+                <option value="24000">24000</option>
+                <option value="20000">20000</option>
+                <option value="16000">16000</option>
+                <option value="12000">12000</option>
+                <option value="10000">10000</option>
+                <option value="8000">8000</option>
+            </select>
+        </div>
+
+        <table class="file-table">
+            <tbody id="file-table-body">
+            </tbody>
+        </table>
+
+        <input id="save-button" type="button" value="Convert and save" disabled></input>
+
+        <footer>
+            <p>* just Ctrl+S this html and use it locally!</p>
+            <p>© 2020 <a href="https://github.com/AlexIII/web-wav-converter">github.com/AlexIII</a></p>
+        </footer>
+    </div>
+
+    <script src="wav-conv.js"></script>
+</body>
+</html>

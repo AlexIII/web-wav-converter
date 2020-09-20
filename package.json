@@ -1,0 +1,15 @@
+{
+  "name": "web-wav-converter",
+  "version": "1.0.0",
+  "description": "Web wav converter",
+  "main": "index.html",
+  "scripts": {
+    "tsc": "tsc",
+    "tscw": "tsc -w"
+  },
+  "author": "github.com/AlexIII",
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "typescript": "^4.0.2"
+  }
+}
