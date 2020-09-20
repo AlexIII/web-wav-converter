@@ -3,12 +3,13 @@ const dragAndDropArea = document.querySelector('.drag-and-drop-area') as HTMLDiv
 const fileInputElem = document.querySelector('#file-input') as HTMLInputElement;
 const fileTableBodyElem = document.querySelector('#file-table-body') as HTMLElement;
 const saveButton = document.querySelector('#save-button') as HTMLInputElement;
+const clearButton = document.querySelector('#clear-button') as HTMLInputElement;
 const sampleRateInput = document.querySelector('#wav-sample-rate') as HTMLInputElement;
 const bitDepthInput = document.querySelector('#wav-bit-depth') as HTMLInputElement;
 const channelsInput = document.querySelector('#wav-channels') as HTMLInputElement;
 
 const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-if(!isFirefox) document.querySelectorAll('.fx-notice').forEach(el => (el as HTMLInputElement).style.display = "block");
+document.querySelectorAll('.fx-notice').forEach(el => (el as HTMLInputElement).style.display = isFirefox? "none" : "block");
 
 const initDragAndDropArea = (elem: HTMLDivElement, highlightClassName: string, ondrop: (files: File[]) => void) => {
     elem.ondrop = (ev: DragEvent) => {
@@ -64,10 +65,16 @@ class AudioFilesProcessor {
         this.updateUI();
         (globalThis as any)['removeFileButtonHandler'] = this.remove.bind(this);
         (globalThis as any)['playPauseButtonHandler'] = this.playPause.bind(this);
-        saveButton.onclick = () => {
-            this.files.forEach(f => this.convertFile(f));
+        saveButton.onclick = () => this.files.forEach(f => this.convertFile(f));
+        clearButton.onclick = () => {
+            this.files = [];
+            if(this.playing !== null) this.playPause(this.playing, false);
+            this.updateUI();
         };
-        sampleRateInput.onchange = bitDepthInput.onchange = channelsInput.onchange = () => this.updateUI();
+        sampleRateInput.onchange = bitDepthInput.onchange = channelsInput.onchange = () => {
+            if(this.playing !== null) this.playPause(this.playing, false);
+            this.updateUI();
+        }
     }
     remove(index: number) {
         if(this.playing !== null) this.playPause(this.playing, false);
@@ -120,7 +127,7 @@ class AudioFilesProcessor {
     private async updateUI(updateStats = true) {
         if(updateStats) this.statsCache = await this.getStats();
         fileTableBodyElem.innerHTML = makeFileTableRows(this.files, this.playing, this.statsCache);
-        saveButton.disabled = !this.files.length;
+        clearButton.disabled = saveButton.disabled = !this.files.length;
     }
 
     private async getStats() : Promise<{
