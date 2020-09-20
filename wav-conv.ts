@@ -1,3 +1,7 @@
+/*
+    MP3 to WAV converter
+    (c) 2020 github.com/AlexIII
+*/
 
 const dragAndDropArea = document.querySelector('.drag-and-drop-area') as HTMLDivElement;
 const fileInputElem = document.querySelector('#file-input') as HTMLInputElement;
@@ -120,7 +124,7 @@ class AudioFilesProcessor {
         );
         const blob = makeWav(rawData, targetOptions.channelOpt === 'both'? 2 : 1, targetOptions.sampleRate, targetOptions.bytesPerSample);
 
-        saveAs(blob, file.name.replace(/(\..+)$/, '.wav'));
+        saveAs(blob, file.name.replace(/\.[0-9a-z]+$/i, '.wav'));
     }
 
     private statsCache: {duration: number; inSize: number; outSize: number;}[] = [];
