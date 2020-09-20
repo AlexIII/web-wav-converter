@@ -7,6 +7,8 @@ const sampleRateInput = document.querySelector('#wav-sample-rate') as HTMLInputE
 const bitDepthInput = document.querySelector('#wav-bit-depth') as HTMLInputElement;
 const channelsInput = document.querySelector('#wav-channels') as HTMLInputElement;
 
+const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+if(!isFirefox) document.querySelectorAll('.fx-notice').forEach(el => (el as HTMLInputElement).style.display = "block");
 
 const initDragAndDropArea = (elem: HTMLDivElement, highlightClassName: string, ondrop: (files: File[]) => void) => {
     elem.ondrop = (ev: DragEvent) => {
@@ -38,13 +40,13 @@ const initOpenFiles = (onopen: (files: File[]) => void) => {
 };
 
 
-const makeFileTableRows = (files: File[], playing: number | null): string => 
+const makeFileTableRows = (files: File[], playing: number | null, stats: {duration: number; inSize: number; outSize: number;}[]): string => 
     files
         .map((f, idx) => `<tr> 
                 <td>${idx+1}</td> 
                 <td>${f.name}</td> 
-                <td>${'??:??'}</td> 
-                <td>${'??.?'}Mbyte -> ${'???.?'}Mbyte</td> 
+                <td>${Math.round(stats[idx].duration/60)}:${Math.round((stats[idx].duration)%60)}</td> 
+                <td>${(stats[idx].inSize/1024/1024).toFixed(1)}Mbyte -> ${(stats[idx].outSize/1024/1024).toFixed(1)}Mbyte</td> 
                 <td onclick="removeFileButtonHandler(${idx});"></td> 
                 <td onclick="playPauseButtonHandler(${idx});">${idx !== playing? "&#x23F5" : "&#x23F8"}</td> 
             </tr>`)
@@ -65,11 +67,13 @@ class AudioFilesProcessor {
         saveButton.onclick = () => {
             this.files.forEach(f => this.convertFile(f));
         };
+        sampleRateInput.onchange = bitDepthInput.onchange = channelsInput.onchange = () => this.updateUI();
     }
     remove(index: number) {
         if(this.playing !== null) this.playPause(this.playing, false);
         this.files.splice(index, 1);
-        this.updateUI();
+        this.statsCache.splice(index, 1);
+        this.updateUI(false);
     }
     playPause(index: number, updateUI = true) {
         if(this.playing === index) {
@@ -83,15 +87,14 @@ class AudioFilesProcessor {
             this.playing = index;
             this.playFile(this.files[index]);   
         }
-        if(updateUI) this.updateUI();
+        if(updateUI) this.updateUI(false);
     }
 
     private async playFile(file: File) {
-        const targetSampleRate = Math.round(Number(sampleRateInput.value));
-        const targetChannelOpt = channelsInput.value;
+        const targetOptions = this.getTargetOptions();
 
         const audioCtx = new AudioContext();
-        const audioBuffer = await processAudioFile(audioCtx, file, targetChannelOpt as any, targetSampleRate);
+        const audioBuffer = await processAudioFile(audioCtx, file, targetOptions.channelOpt, targetOptions.sampleRate);
         const song = audioCtx.createBufferSource();
         song.buffer = audioBuffer;              
         song.connect(audioCtx.destination);
@@ -101,23 +104,46 @@ class AudioFilesProcessor {
     }
 
     private async convertFile(file: File) {
-        const targetSampleRate = Math.round(Number(sampleRateInput.value));
-        const targetBytePerSample = Math.round(Number(bitDepthInput.value)) === 8? 1 : 2;
-        const targetChannelOpt = channelsInput.value;
+        const targetOptions = this.getTargetOptions();
         const audioCtx = new AudioContext();
-        const audioBuffer = await processAudioFile(audioCtx, file, targetChannelOpt as any, targetSampleRate);
+        const audioBuffer = await processAudioFile(audioCtx, file, targetOptions.channelOpt, targetOptions.sampleRate);
         const rawData = audioToRawWave(
-            targetChannelOpt === 'both'? [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)] : [audioBuffer.getChannelData(0)],
-            targetBytePerSample
+            targetOptions.channelOpt === 'both'? [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)] : [audioBuffer.getChannelData(0)],
+            targetOptions.bytesPerSample
         );
-        const blob = makeWav(rawData, targetChannelOpt === 'both'? 2 : 1, targetSampleRate, targetBytePerSample);
+        const blob = makeWav(rawData, targetOptions.channelOpt === 'both'? 2 : 1, targetOptions.sampleRate, targetOptions.bytesPerSample);
 
         saveAs(blob, file.name.replace(/(\..+)$/, '.wav'));
     }
 
-    private updateUI() {
-        fileTableBodyElem.innerHTML = makeFileTableRows(this.files, this.playing);
+    private statsCache: {duration: number; inSize: number; outSize: number;}[] = [];
+    private async updateUI(updateStats = true) {
+        if(updateStats) this.statsCache = await this.getStats();
+        fileTableBodyElem.innerHTML = makeFileTableRows(this.files, this.playing, this.statsCache);
         saveButton.disabled = !this.files.length;
+    }
+
+    private async getStats() : Promise<{
+        duration: number;
+        inSize: number;
+        outSize: number;
+    }[]> {
+        const targetOptions = this.getTargetOptions();
+        const audioCtx = new AudioContext();
+        const decoded: Array<[AudioBuffer, number]> = await Promise.all(this.files.map(async(f) => [await audioCtx.decodeAudioData(await f.arrayBuffer()), f.size])) as any;
+        return decoded.map(([f, inSize]) => ({
+            duration: f.duration,
+            inSize,
+            outSize: (f.length / f.sampleRate) * targetOptions.sampleRate * targetOptions.bytesPerSample * (targetOptions.channelOpt === 'both'? 2 : 1)
+        }));
+    }
+
+    private getTargetOptions() {
+        return {
+            sampleRate: Math.round(Number(sampleRateInput.value)),
+            bytesPerSample: (Math.round(Number(bitDepthInput.value)) === 8? 1 : 2) as 1 | 2,
+            channelOpt: channelsInput.value as 'both' | 'left' | 'right' | 'mix'
+        };
     }
 }
 
@@ -143,7 +169,7 @@ const saveAs = (blob: Blob, fileName: string) => {
 /* --- Audio processing --- */
 
 const audioResample = (buffer: AudioBuffer, sampleRate: number): Promise<AudioBuffer> => {
-    const offlineCtx = new OfflineAudioContext(2, sampleRate*40, sampleRate);
+    const offlineCtx = new OfflineAudioContext(2, (buffer.length / buffer.sampleRate) * sampleRate, sampleRate);
     const source = offlineCtx.createBufferSource();
     source.buffer = buffer;
     source.connect(offlineCtx.destination);
@@ -180,7 +206,7 @@ const processAudioFile = async (audioCtx: AudioContext, file: File, targetChanne
 
 const audioToRawWave = (audioChannels: Float32Array[], bytesPerSample: 1 | 2, mixChannels = false): Uint8Array => {
     const bufferLength = audioChannels[0].length;
-    const numberOfChannels = audioChannels.length;
+    const numberOfChannels = audioChannels.length === 1? 1 : 2;
     const reducedData = new Uint8Array(bufferLength * numberOfChannels * bytesPerSample);
     for (let i = 0; i < bufferLength; ++i) {
         for (let channel = 0; channel < (mixChannels? 1 : numberOfChannels); ++channel) {

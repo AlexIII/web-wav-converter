@@ -19,6 +19,7 @@ p, input {
 
 input[type=button] {
     padding: 5px 20px 5px 20px;
+    margin-top: 10px;
 }
 
 .page-wrapper {
@@ -32,13 +33,11 @@ input[type=button] {
 .page-wrapper > h1 {
     color: #333;
     font-size: 24px;
+    margin-bottom: 10px;
 }
 .page-wrapper > h2 {
-    margin-bottom: 20px;
     color: #333;
     font-size: 15px;
-}
-.page-wrapper > * {
     margin-bottom: 10px;
 }
 .page-wrapper > footer {
@@ -52,6 +51,11 @@ input[type=button] {
     color: #666;
 }
 
+.fx-notice {
+    font-size: 0.7rem;
+    color: #A00;
+    display: none;
+}
 
 .drag-and-drop-area {
     display: flex;
@@ -64,6 +68,7 @@ input[type=button] {
     border-radius: 10px;
     border: dashed 4px gray;
     margin-bottom: 20px;
+    margin-top: 20px;
 }
 .drag-and-drop-area-highlight {
     background-color: #F006;
@@ -73,6 +78,7 @@ input[type=button] {
     display: flex;
     flex-direction: row;
     align-items: center;
+    margin-bottom: 20px;
 }
 .wav-settings > label {
     margin-right: 5px;
