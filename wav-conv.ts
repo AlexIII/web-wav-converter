@@ -11,9 +11,12 @@ const clearButton = document.querySelector('#clear-button') as HTMLInputElement;
 const sampleRateInput = document.querySelector('#wav-sample-rate') as HTMLInputElement;
 const bitDepthInput = document.querySelector('#wav-bit-depth') as HTMLInputElement;
 const channelsInput = document.querySelector('#wav-channels') as HTMLInputElement;
+const waitOverlayElem = document.querySelector('.overlay-wait') as HTMLDivElement;
 
 const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 document.querySelectorAll('.fx-notice').forEach(el => (el as HTMLInputElement).style.display = isFirefox? "none" : "block");
+
+const waitOverlay = (isOn: boolean) => (waitOverlayElem.style.visibility = isOn? 'visible' : 'collapse', undefined);
 
 const initDragAndDropArea = (elem: HTMLDivElement, highlightClassName: string, ondrop: (files: File[]) => void) => {
     elem.ondrop = (ev: DragEvent) => {
@@ -69,7 +72,11 @@ class AudioFilesProcessor {
         this.updateUI();
         (globalThis as any)['removeFileButtonHandler'] = this.remove.bind(this);
         (globalThis as any)['playPauseButtonHandler'] = this.playPause.bind(this);
-        saveButton.onclick = () => this.files.forEach(f => this.convertFile(f));
+        saveButton.onclick = async () => {
+            waitOverlay(true);
+            await Promise.all(this.files.map(f => this.convertFile(f)));
+            waitOverlay(false);
+        }
         clearButton.onclick = () => {
             this.files = [];
             if(this.playing !== null) this.playPause(this.playing, false);
@@ -129,7 +136,12 @@ class AudioFilesProcessor {
 
     private statsCache: {duration: number; inSize: number; outSize: number;}[] = [];
     private async updateUI(updateStats = true) {
-        if(updateStats) this.statsCache = await this.getStats();
+        if(updateStats) {
+            const tId = setTimeout(() => waitOverlay(true), 300);
+            this.statsCache = await this.getStats();
+            clearTimeout(tId);
+            waitOverlay(false);
+        }
         fileTableBodyElem.innerHTML = makeFileTableRows(this.files, this.playing, this.statsCache);
         clearButton.disabled = saveButton.disabled = !this.files.length;
     }

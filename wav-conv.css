@@ -142,3 +142,24 @@ input[type=button] {
 .custom-file-input:active::before {
     background: -webkit-linear-gradient(top, #e3e3e3, #f9f9f9);
 }
+
+.overlay-wait {
+    visibility: collapse;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color:#0008;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    top: 0px;
+    left: 0px;
+    text-align: center;
+}
+.overlay-wait::before {
+    font-weight: bold;
+    color: rgb(250,250,250);
+    font-size: 25px;
+    content: "Processing your files. Please wait...";
+}

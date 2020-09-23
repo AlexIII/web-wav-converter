@@ -6,7 +6,7 @@
 - Processes files in bulk
 - Accepts most audio formats
 
-[Try here!](https://alexiii.github.io/web-wav-converter)
+[Try it here!](https://alexiii.github.io/web-wav-converter)
 
 
 ## Description

@@ -9,7 +9,7 @@
     "build-win": "tsc && terser --compress --output wav-conv.js -- wav-conv.js && inliner -m ./wav-conv.html > index.html && del wav-conv.js.* 2> nul"
   },
   "author": "github.com/AlexIII",
-  "license": "BSD-3-Clause",
+  "license": "MIT",
   "devDependencies": {
     "inliner": "^1.13.1",
     "terser": "^5.3.2",
