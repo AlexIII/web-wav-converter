@@ -16,6 +16,18 @@ const waitOverlayElem = document.querySelector('.overlay-wait') as HTMLDivElemen
 const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 document.querySelectorAll('.fx-notice').forEach(el => (el as HTMLInputElement).style.display = isFirefox? "none" : "block");
 
+// get initial settings from URL hash anchor
+// example: index.html#8&mix&32000
+if(window.location.hash) {
+    const initVals = window.location.hash.substr(1).split('&')
+    const bitDepth = ~~initVals[0];
+    const channels = initVals[1];
+    const sampleRate = ~~initVals[2];
+    if(bitDepth === 8 || bitDepth === 16) bitDepthInput.value = String(bitDepth);
+    if(channels === 'both' || channels === 'left' || channels === 'right' || channels === 'mix') channelsInput.value = channels;
+    if(sampleRate >= 8000 || sampleRate <= 64000) sampleRateInput.value = String(sampleRate);
+}
+
 const waitOverlay = (isOn: boolean) => (waitOverlayElem.style.visibility = isOn? 'visible' : 'collapse', undefined);
 
 const initDragAndDropArea = (elem: HTMLDivElement, highlightClassName: string, ondrop: (files: File[]) => void) => {
@@ -46,7 +58,6 @@ const initOpenFiles = (onopen: (files: File[]) => void) => {
         }
     };
 };
-
 
 const makeFileTableRows = (files: File[], playing: number | null, stats: {duration: number; inSize: number; outSize: number;}[]): string => 
     files
