@@ -61,20 +61,20 @@ const makeFileTableRows = (files: File[], playing: number | null, stats: {durati
         .join('\n');
 
 class AudioFilesProcessor {
-    private files: File[] = [];
+    private files: {
+        file: File, 
+        audioBuffer: AudioBuffer
+    }[] = [];
     private playing: number | null = null;
     private stopPlaying: (() => void) | null = null;
 
-    add(files: File[]) {
-        //do not add files with the same name twice
-        this.files.push(...files.filter(f => !this.files.map(f => f.name).includes(f.name)));
-        this.files.sort((a, b) => a.name.localeCompare(b.name));
-        this.updateUI();
+    constructor() {
         (globalThis as any)['removeFileButtonHandler'] = this.remove.bind(this);
         (globalThis as any)['playPauseButtonHandler'] = this.playPause.bind(this);
         saveButton.onclick = async () => {
+            if(!this.files.length) return;
             waitOverlay(true);
-            await Promise.all(this.files.map(f => this.convertFile(f)));
+            await Promise.all(this.files.map(f => this.convertAndSaveAudioBuffer(f.audioBuffer, f.file.name.replace(/\.[0-9a-z]+$/i, '.wav'))));
             waitOverlay(false);
         }
         clearButton.onclick = () => {
@@ -87,11 +87,24 @@ class AudioFilesProcessor {
             this.updateUI();
         }
     }
+
+    async add(files: File[]) {
+        //do not add files with the same name twice
+        const tId = setTimeout(() => waitOverlay(true), 300);
+        const filesToAdd = files.filter(f => !this.files.map(({file}) => file.name).includes(f.name));
+        this.files.push(...await Promise.all(filesToAdd.map(async (file) => ({
+            file, 
+            audioBuffer: await new AudioContext().decodeAudioData(await file.arrayBuffer())
+        }))));
+        this.files.sort((a, b) => a.file.name.localeCompare(b.file.name));
+        clearTimeout(tId);
+        waitOverlay(false);
+        this.updateUI();
+    }
     remove(index: number) {
         if(this.playing !== null) this.playPause(this.playing, false);
         this.files.splice(index, 1);
-        this.statsCache.splice(index, 1);
-        this.updateUI(false);
+        this.updateUI();
     }
     playPause(index: number, updateUI = true) {
         if(this.playing === index) {
@@ -103,16 +116,15 @@ class AudioFilesProcessor {
         } else {
             if(this.playing !== null) this.playPause(this.playing, false);
             this.playing = index;
-            this.playFile(this.files[index]);   
+            this.playAudioBuffer(this.files[index].audioBuffer);   
         }
-        if(updateUI) this.updateUI(false);
+        if(updateUI) this.updateUI();
     }
 
-    private async playFile(file: File) {
+    private async playAudioBuffer(audioBufferIn: AudioBuffer) {
         const targetOptions = this.getTargetOptions();
-
         const audioCtx = new AudioContext();
-        const audioBuffer = await processAudioFile(audioCtx, file, targetOptions.channelOpt, targetOptions.sampleRate);
+        const audioBuffer = await processAudioFile(audioBufferIn, targetOptions.channelOpt, targetOptions.sampleRate);
         const song = audioCtx.createBufferSource();
         song.buffer = audioBuffer;              
         song.connect(audioCtx.destination);
@@ -121,44 +133,31 @@ class AudioFilesProcessor {
         song.onended = () => this.playing !== null && this.playPause(this.playing);
     }
 
-    private async convertFile(file: File) {
+    private async convertAndSaveAudioBuffer(audioBufferIn: AudioBuffer, saveFileName: string) {
         const targetOptions = this.getTargetOptions();
         const audioCtx = new AudioContext();
-        const audioBuffer = await processAudioFile(audioCtx, file, targetOptions.channelOpt, targetOptions.sampleRate);
+        const audioBuffer = await processAudioFile(audioBufferIn, targetOptions.channelOpt, targetOptions.sampleRate);
         const rawData = audioToRawWave(
             targetOptions.channelOpt === 'both'? [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)] : [audioBuffer.getChannelData(0)],
             targetOptions.bytesPerSample
         );
         const blob = makeWav(rawData, targetOptions.channelOpt === 'both'? 2 : 1, targetOptions.sampleRate, targetOptions.bytesPerSample);
 
-        saveAs(blob, file.name.replace(/\.[0-9a-z]+$/i, '.wav'));
+        saveAs(blob, saveFileName);
     }
 
-    private statsCache: {duration: number; inSize: number; outSize: number;}[] = [];
-    private async updateUI(updateStats = true) {
-        if(updateStats) {
-            const tId = setTimeout(() => waitOverlay(true), 300);
-            this.statsCache = await this.getStats();
-            clearTimeout(tId);
-            waitOverlay(false);
-        }
-        fileTableBodyElem.innerHTML = makeFileTableRows(this.files, this.playing, this.statsCache);
-        clearButton.disabled = saveButton.disabled = !this.files.length;
-    }
-
-    private async getStats() : Promise<{
-        duration: number;
-        inSize: number;
-        outSize: number;
-    }[]> {
+    private async updateUI() {
         const targetOptions = this.getTargetOptions();
-        const audioCtx = new AudioContext();
-        const decoded: Array<[AudioBuffer, number]> = await Promise.all(this.files.map(async(f) => [await audioCtx.decodeAudioData(await f.arrayBuffer()), f.size])) as any;
-        return decoded.map(([f, inSize]) => ({
-            duration: f.duration,
-            inSize,
-            outSize: (f.length / f.sampleRate) * targetOptions.sampleRate * targetOptions.bytesPerSample * (targetOptions.channelOpt === 'both'? 2 : 1)
-        }));
+        fileTableBodyElem.innerHTML = makeFileTableRows(
+            this.files.map(({file}) => file), 
+            this.playing, 
+            this.files.map(({audioBuffer, file}) => ({
+                duration: audioBuffer.duration,
+                inSize: file.size,
+                outSize: (audioBuffer.length / audioBuffer.sampleRate) * targetOptions.sampleRate * targetOptions.bytesPerSample * (targetOptions.channelOpt === 'both'? 2 : 1)
+            }))
+        );
+        clearButton.disabled = saveButton.disabled = !this.files.length;
     }
 
     private getTargetOptions() {
@@ -219,12 +218,10 @@ const audioReduceChannels = (buffer: AudioBuffer, targetChannelOpt: 'both' | 'le
     return outBuffer;
 };
 
-const processAudioFile = async (audioCtx: AudioContext, file: File, targetChannelOpt: 'both' | 'left' | 'right' | 'mix', targetSampleRate: number): Promise<AudioBuffer> => {
-    const dataFileStraem = await file.arrayBuffer();
-    const decoded = await audioCtx.decodeAudioData(dataFileStraem);
-    const resampled = await audioResample(decoded, targetSampleRate);
-    const audioBuffer = audioReduceChannels(resampled, targetChannelOpt);
-    return audioBuffer;
+const processAudioFile = async (audioBufferIn: AudioBuffer, targetChannelOpt: 'both' | 'left' | 'right' | 'mix', targetSampleRate: number): Promise<AudioBuffer> => {
+    const resampled = await audioResample(audioBufferIn, targetSampleRate);
+    const audioBufferOut = audioReduceChannels(resampled, targetChannelOpt);
+    return audioBufferOut;
 }
 
 const audioToRawWave = (audioChannels: Float32Array[], bytesPerSample: 1 | 2, mixChannels = false): Uint8Array => {
