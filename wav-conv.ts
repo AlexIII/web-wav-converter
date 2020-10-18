@@ -146,7 +146,6 @@ class AudioFilesProcessor {
 
     private async convertAndSaveAudioBuffer(audioBufferIn: AudioBuffer, saveFileName: string) {
         const targetOptions = this.getTargetOptions();
-        const audioCtx = new AudioContext();
         const audioBuffer = await processAudioFile(audioBufferIn, targetOptions.channelOpt, targetOptions.sampleRate);
         const rawData = audioToRawWave(
             targetOptions.channelOpt === 'both'? [audioBuffer.getChannelData(0), audioBuffer.getChannelData(1)] : [audioBuffer.getChannelData(0)],
@@ -211,7 +210,7 @@ const audioResample = (buffer: AudioBuffer, sampleRate: number): Promise<AudioBu
 };
 
 const audioReduceChannels = (buffer: AudioBuffer, targetChannelOpt: 'both' | 'left' | 'right' | 'mix'): AudioBuffer => {
-    if(targetChannelOpt === 'both') return buffer;
+    if(targetChannelOpt === 'both' || buffer.numberOfChannels < 2) return buffer;
     const outBuffer = new AudioBuffer({
         sampleRate: buffer.sampleRate, 
         length: buffer.length, 
@@ -229,10 +228,23 @@ const audioReduceChannels = (buffer: AudioBuffer, targetChannelOpt: 'both' | 'le
     return outBuffer;
 };
 
+const audioNormalize = (buffer: AudioBuffer): AudioBuffer => {
+    const data = Array.from(Array(buffer.numberOfChannels)).map((_, idx) => buffer.getChannelData(idx));
+    const maxAmplitude = Math.max(...data.map(chan => chan.reduce((acc, cur) => Math.max(acc, Math.abs(cur)), 0)));
+    if(maxAmplitude >= 1.0) return buffer;
+    const coeff = 1.0 / maxAmplitude;
+    data.forEach(chan => {
+        chan.forEach((v, idx) => chan[idx] = v*coeff);
+        buffer.copyToChannel(chan, 0);
+    });
+    return buffer;
+};
+
 const processAudioFile = async (audioBufferIn: AudioBuffer, targetChannelOpt: 'both' | 'left' | 'right' | 'mix', targetSampleRate: number): Promise<AudioBuffer> => {
     const resampled = await audioResample(audioBufferIn, targetSampleRate);
-    const audioBufferOut = audioReduceChannels(resampled, targetChannelOpt);
-    return audioBufferOut;
+    const reduced = audioReduceChannels(resampled, targetChannelOpt);
+    const normalized = audioNormalize(reduced);
+    return normalized;
 }
 
 const audioToRawWave = (audioChannels: Float32Array[], bytesPerSample: 1 | 2, mixChannels = false): Uint8Array => {
