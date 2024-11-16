@@ -9,7 +9,7 @@
 [Try it here!](https://alexiii.github.io/web-wav-converter)
 
 
-## Description
+### Description
 
 This is a single-page audio converter that uses in-browser API to convert any audio file into an uncompressed PCM [WAV](https://en.wikipedia.org/wiki/WAV) file.
 
@@ -21,9 +21,9 @@ For offline usage just download `index.html` and open it in a browser.
 
 The primary use case for this app is converting audio files to use them in an embedded environment where you cannot afford to run audio decompression algorithms.
 
-## Notice
+## Notice for Chrome users
 
-It is recommended to use this converter in Firefox. Firefox provides much better resampling quality (compared to Chrome), which especially noticeable on low sample rates (e.g. 8000).
+It is recommended to use this converter in Firefox. Firefox uses processing algorithns that provide much better resampling quality compared to Chrome, which especially noticeable on low sample rates (e.g. 8000).
 
 ## License
 
